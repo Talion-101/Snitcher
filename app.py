@@ -55,7 +55,7 @@ def parse_date(date_str):
     except:
         return None
 
-def process_snitcher_data(file_content, file_extension):
+def process_snitcher_data(file_content, file_extension, time_period_days=1, output_format='list'):
     """Process the uploaded Snitcher file and return formatted daily report"""
     try:
         # Parse the file based on extension
@@ -92,9 +92,9 @@ def process_snitcher_data(file_content, file_extension):
         # Find the latest date in the data
         latest_date = max(all_dates)
         
-        # Use the most recent 24 hours as the reporting period
+        # Use the specified time period as the reporting period
         report_end = latest_date
-        report_start = latest_date - timedelta(hours=24)
+        report_start = latest_date - timedelta(days=time_period_days)
         
         valid_visits = []
         for row in data:
@@ -102,7 +102,7 @@ def process_snitcher_data(file_content, file_extension):
                 continue
                 
             last_visit = parse_date(row['Last visit'])
-            # Filter for visits in the last 24 hours from the latest visit
+            # Filter for visits in the specified time period from the latest visit
             if not last_visit or last_visit < report_start or last_visit > report_end:
                 continue
                 
@@ -113,7 +113,8 @@ def process_snitcher_data(file_content, file_extension):
             })
         
         if not valid_visits:
-            return f"No visits found in the 24 hours ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}."
+            period_text = f"{time_period_days} day{'s' if time_period_days > 1 else ''}"
+            return f"No visits found in the last {period_text} ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}."
         
         # Sort by last visit descending for deduplication
         valid_visits.sort(key=lambda x: x['last_visit'], reverse=True)
@@ -128,67 +129,134 @@ def process_snitcher_data(file_content, file_extension):
         final_visits = list(unique_companies.values())
         final_visits.sort(key=lambda x: x['last_visit'])
         
-        # Process each visit
-        formatted_visits = []
-        for visit in final_visits:
-            company = visit['name']
-            pages_visited = visit['pages'] or ''
-            
-            # Skip if company name is empty
-            if not company:
-                continue
+        if not final_visits:
+            period_text = f"{time_period_days} day{'s' if time_period_days > 1 else ''}"
+            return f"No valid company visits found in the last {period_text} ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}."
+        
+        # Format the report based on output format
+        if output_format == 'table':
+            # Table format
+            table_header = "Company | Visited Site\n" + "-" * 50
+            table_rows = []
+            for visit in final_visits:
+                company = visit['name']
+                pages_visited = visit['pages'] or ''
                 
-            # Determine action based on pages visited
-            action = "visited homepage"
-            
-            if pages_visited:
-                pages_str = str(pages_visited)
-                
-                # Check if it contains homepage indicators
-                if 'hsCtaTracking' in pages_str or '_hcms' in pages_str:
-                    action = "visited homepage"
-                else:
-                    # Split by common separators and take the first URL
-                    first_page = pages_str.split(',')[0].split(';')[0].strip()
+                # Skip if company name is empty
+                if not company:
+                    continue
                     
-                    if first_page and first_page != '/':
-                        # Extract meaningful part from URL
-                        if first_page.startswith('http'):
-                            parsed_url = urlparse(first_page)
-                            path = parsed_url.path.strip('/')
-                        else:
-                            path = first_page.strip('/')
+                # Determine site description
+                site_description = "Homepage"
+                
+                if pages_visited:
+                    pages_str = str(pages_visited)
+                    
+                    # Check if it contains homepage indicators
+                    if 'hsCtaTracking' in pages_str or '_hcms' in pages_str:
+                        site_description = "Homepage"
+                    else:
+                        # Split by common separators and take the first URL
+                        first_page = pages_str.split(',')[0].split(';')[0].strip()
                         
-                        if path:
-                            # Get the last segment of the path
-                            segments = path.split('/')
-                            last_segment = segments[-1] if segments else ''
+                        if first_page and first_page != '/':
+                            # Extract meaningful part from URL
+                            if first_page.startswith('http'):
+                                parsed_url = urlparse(first_page)
+                                path = parsed_url.path.strip('/')
+                            else:
+                                path = first_page.strip('/')
                             
-                            # If last segment is empty or just numbers/IDs, use the previous segment
-                            if not last_segment or last_segment.isdigit() or len(last_segment) < 3:
-                                if len(segments) > 1:
-                                    last_segment = segments[-2]
-                                else:
-                                    last_segment = segments[0] if segments else ''
-                            
-                            if last_segment:
-                                # Remove file extensions
-                                last_segment = re.sub(r'\.[^.]*$', '', last_segment)
-                                # Replace hyphens and underscores with spaces
-                                formatted_action = re.sub(r'[-_]', ' ', last_segment)
-                                # Clean up the action
-                                formatted_action = formatted_action.strip().lower()
-                                if formatted_action:
-                                    action = f"viewed {formatted_action}"
+                            if path:
+                                # Get the last segment of the path
+                                segments = path.split('/')
+                                last_segment = segments[-1] if segments else ''
+                                
+                                # If last segment is empty or just numbers/IDs, use the previous segment
+                                if not last_segment or last_segment.isdigit() or len(last_segment) < 3:
+                                    if len(segments) > 1:
+                                        last_segment = segments[-2]
+                                    else:
+                                        last_segment = segments[0] if segments else ''
+                                
+                                if last_segment:
+                                    # Remove file extensions
+                                    last_segment = re.sub(r'\.[^.]*$', '', last_segment)
+                                    # Replace hyphens and underscores with spaces
+                                    formatted_page = re.sub(r'[-_]', ' ', last_segment)
+                                    # Clean up and capitalize
+                                    formatted_page = formatted_page.strip().title()
+                                    if formatted_page:
+                                        site_description = formatted_page
+                
+                table_rows.append(f"{company} | {site_description}")
             
-            formatted_visits.append(f"- {company}, {action}")
-        
-        if not formatted_visits:
-            return f"No valid company visits found in the 24 hours ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}."
-        
-        # Format the report - use the day of the latest visit for the report date
-        report_date = latest_date.strftime("%B %d, %Y")
-        report = f"EOD {report_date}\n" + "\n".join(formatted_visits)
+            # Format the table report
+            period_text = f"{time_period_days} day{'s' if time_period_days > 1 else ''}"
+            report_date = latest_date.strftime("%B %d, %Y")
+            report = f"Visitor Report - Last {period_text} (ending {report_date})\n\n"
+            report += table_header + "\n" + "\n".join(table_rows)
+            
+        else:
+            # List format (original)
+            formatted_visits = []
+            for visit in final_visits:
+                company = visit['name']
+                pages_visited = visit['pages'] or ''
+                
+                # Skip if company name is empty
+                if not company:
+                    continue
+                    
+                # Determine action based on pages visited
+                action = "visited homepage"
+                
+                if pages_visited:
+                    pages_str = str(pages_visited)
+                    
+                    # Check if it contains homepage indicators
+                    if 'hsCtaTracking' in pages_str or '_hcms' in pages_str:
+                        action = "visited homepage"
+                    else:
+                        # Split by common separators and take the first URL
+                        first_page = pages_str.split(',')[0].split(';')[0].strip()
+                        
+                        if first_page and first_page != '/':
+                            # Extract meaningful part from URL
+                            if first_page.startswith('http'):
+                                parsed_url = urlparse(first_page)
+                                path = parsed_url.path.strip('/')
+                            else:
+                                path = first_page.strip('/')
+                            
+                            if path:
+                                # Get the last segment of the path
+                                segments = path.split('/')
+                                last_segment = segments[-1] if segments else ''
+                                
+                                # If last segment is empty or just numbers/IDs, use the previous segment
+                                if not last_segment or last_segment.isdigit() or len(last_segment) < 3:
+                                    if len(segments) > 1:
+                                        last_segment = segments[-2]
+                                    else:
+                                        last_segment = segments[0] if segments else ''
+                                
+                                if last_segment:
+                                    # Remove file extensions
+                                    last_segment = re.sub(r'\.[^.]*$', '', last_segment)
+                                    # Replace hyphens and underscores with spaces
+                                    formatted_action = re.sub(r'[-_]', ' ', last_segment)
+                                    # Clean up the action
+                                    formatted_action = formatted_action.strip().lower()
+                                    if formatted_action:
+                                        action = f"viewed {formatted_action}"
+                
+                formatted_visits.append(f"• {company}, {action}")
+            
+            # Format the report - use the day of the latest visit for the report date
+            report_date = latest_date.strftime("%B %d, %Y")
+            report_time = latest_date.strftime("%I:%M %p EST")
+            report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n" + "\n".join(formatted_visits)
         
         return report
         
@@ -215,6 +283,17 @@ def upload_file():
             return render_template('upload.html')
         
         try:
+            # Get form parameters with validation
+            time_period = int(request.form.get('time_period', 1))
+            if time_period < 1:
+                time_period = 1
+            elif time_period > 365:  # Max 1 year
+                time_period = 365
+                
+            output_format = request.form.get('output_format', 'list')
+            if output_format not in ['list', 'table']:
+                output_format = 'list'
+            
             # Read file content
             file_content = file.read()
             file_extension = os.path.splitext(filename)[1]
@@ -222,9 +301,9 @@ def upload_file():
             # Process the file
             if file_extension.lower() == '.csv':
                 content_str = file_content.decode('utf-8')
-                report = process_snitcher_data(content_str, file_extension)
+                report = process_snitcher_data(content_str, file_extension, time_period, output_format)
             else:
-                report = process_snitcher_data(file_content, file_extension)
+                report = process_snitcher_data(file_content, file_extension, time_period, output_format)
             
             return render_template('upload.html', report=report, success=True)
             

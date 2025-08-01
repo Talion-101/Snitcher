@@ -59,6 +59,39 @@
                         </div>
                     </div>
 
+                    <!-- Report Options -->
+                    <div class="options-section mb-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="timePeriod" class="form-label option-label">
+                                    <i class="fas fa-calendar-alt me-2"></i>
+                                    Time Period
+                                </label>
+                                <select id="timePeriod" name="time_period" class="form-select glass-select">
+                                    <option value="1">Last 1 day (24 hours)</option>
+                                    <option value="2">Last 2 days (48 hours)</option>
+                                    <option value="3">Last 3 days (72 hours)</option>
+                                    <option value="4">Last 4 days</option>
+                                    <option value="5">Last 5 days</option>
+                                    <option value="6">Last 6 days</option>
+                                    <option value="7">Last 7 days (1 week)</option>
+                                    <option value="14">Last 14 days (2 weeks)</option>
+                                    <option value="30">Last 30 days (1 month)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="outputFormat" class="form-label option-label">
+                                    <i class="fas fa-list me-2"></i>
+                                    Output Format
+                                </label>
+                                <select id="outputFormat" name="output_format" class="form-select glass-select">
+                                    <option value="list">List Format (Daily Update with Bullets)</option>
+                                    <option value="table">Table Format (Company | Visited Site)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="text-center">
                         <button type="submit" class="btn-glow" id="processBtn">
                             <i class="fas fa-cogs me-2"></i>
