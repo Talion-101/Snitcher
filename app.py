@@ -52,11 +52,14 @@ def process_snitcher_data(file_content, file_extension):
         if df_filtered.empty:
             return "No visits found in the last 24 hours."
         
-        # Sort by Last visit descending to get latest visits first
+        # Sort by Last visit descending to get latest visits first for deduplication
         df_filtered = df_filtered.sort_values('Last visit', ascending=False)
         
         # Keep only latest visit per company (first occurrence after sorting)
         df_latest = df_filtered.drop_duplicates(subset=['Name'], keep='first')
+        
+        # Now sort by Last visit ascending (oldest to newest) for final output
+        df_latest = df_latest.sort_values('Last visit', ascending=True)
         
         # Process each visit
         visits = []
