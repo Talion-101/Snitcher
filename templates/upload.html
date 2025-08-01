@@ -145,7 +145,7 @@
                         </div>
                         <button class="btn-copy" id="copyBtn" onclick="copyReport()">
                             <i class="fas fa-copy me-2"></i>
-                            Copy to Clipboard
+                            Copy for MS Teams
                         </button>
                     </div>
                     
@@ -339,7 +339,7 @@
     <!-- Copy Success Notification -->
     <div class="copy-notification" id="copyNotification">
         <i class="fas fa-check-circle me-2"></i>
-        Copied to clipboard!
+        Copied for MS Teams! Ready to paste.
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -365,45 +365,95 @@
             }
         });
 
-        // Copy to clipboard function
+        // Copy to clipboard function - MS Teams friendly
         function copyReport() {
             let reportContent = '';
             
             // Get all report boxes content
             const reportBoxes = document.querySelectorAll('.report-box-content');
             reportBoxes.forEach((box, index) => {
-                if (index > 0) reportContent += '\n\n--- \n\n'; // Separator between formats
+                if (index > 0) reportContent += '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'; // Separator between formats
                 
                 const preElement = box.querySelector('pre');
                 const tableElement = box.querySelector('.report-table');
                 const headerElement = box.querySelector('.table-header-text');
                 
                 if (preElement) {
-                    // List format
-                    reportContent += preElement.textContent;
+                    // List format - MS Teams friendly
+                    let listContent = preElement.textContent;
+                    
+                    // Ensure proper line breaks for MS Teams
+                    listContent = listContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                    
+                    // Split into lines and process each
+                    const lines = listContent.split('\n');
+                    const processedLines = lines.map(line => {
+                        line = line.trim();
+                        if (line.startsWith('•')) {
+                            // Already has bullet, ensure proper spacing
+                            return line;
+                        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                            // Convert dash/asterisk to bullet point
+                            return '• ' + line.substring(2);
+                        } else if (line.length > 0 && !line.startsWith('Here is the daily')) {
+                            // Add bullet if it's a company line
+                            if (line.includes(',')) {
+                                return '• ' + line;
+                            }
+                        }
+                        return line;
+                    });
+                    
+                    reportContent += processedLines.join('\n');
+                    
                 } else if (tableElement && headerElement) {
-                    // Table format
+                    // Table format - MS Teams friendly
                     reportContent += headerElement.textContent + '\n\n';
                     
-                    // Extract table data
+                    // Extract table data and format for MS Teams
                     const rows = tableElement.querySelectorAll('tr');
+                    const tableData = [];
+                    
                     rows.forEach((row, rowIndex) => {
                         const cells = row.querySelectorAll('th, td');
                         const rowData = Array.from(cells).map(cell => cell.textContent.trim());
-                        if (rowIndex === 0) {
-                            // Header row
-                            reportContent += rowData.join(',') + '\n';
-                        } else {
-                            // Data rows - handle CSV escaping
-                            const escapedData = rowData.map(cell => {
-                                if (cell.includes(',')) {
-                                    return `"${cell.replace(/"/g, '""')}"`;
-                                }
-                                return cell;
-                            });
-                            reportContent += escapedData.join(',') + '\n';
-                        }
+                        tableData.push(rowData);
                     });
+                    
+                    if (tableData.length > 0) {
+                        // Create a simple table format for MS Teams
+                        const headers = tableData[0];
+                        const maxWidths = headers.map((header, colIndex) => {
+                            let maxWidth = header.length;
+                            for (let i = 1; i < tableData.length; i++) {
+                                if (tableData[i][colIndex]) {
+                                    maxWidth = Math.max(maxWidth, tableData[i][colIndex].length);
+                                }
+                            }
+                            return Math.min(maxWidth, 30); // Cap at 30 characters
+                        });
+                        
+                        // Header row
+                        const headerRow = headers.map((header, index) => 
+                            header.padEnd(maxWidths[index])
+                        ).join(' | ');
+                        reportContent += headerRow + '\n';
+                        
+                        // Separator row
+                        const separatorRow = maxWidths.map(width => 
+                            '-'.repeat(width)
+                        ).join('-|-');
+                        reportContent += separatorRow + '\n';
+                        
+                        // Data rows
+                        for (let i = 1; i < tableData.length; i++) {
+                            const dataRow = tableData[i].map((cell, index) => {
+                                const truncated = cell.length > 30 ? cell.substring(0, 27) + '...' : cell;
+                                return truncated.padEnd(maxWidths[index]);
+                            }).join(' | ');
+                            reportContent += dataRow + '\n';
+                        }
+                    }
                 }
             });
             
@@ -411,9 +461,24 @@
             if (!reportContent.trim()) {
                 const oldReportElement = document.getElementById('reportContent');
                 if (oldReportElement) {
-                    reportContent = oldReportElement.textContent;
+                    let fallbackContent = oldReportElement.textContent;
+                    // Process fallback content for MS Teams
+                    fallbackContent = fallbackContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                    const lines = fallbackContent.split('\n').map(line => {
+                        line = line.trim();
+                        if (line.startsWith('- ') || line.startsWith('* ')) {
+                            return '• ' + line.substring(2);
+                        }
+                        return line;
+                    });
+                    reportContent = lines.join('\n');
                 }
             }
+            
+            // Ensure clean formatting for MS Teams
+            reportContent = reportContent
+                .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
+                .trim();
             
             navigator.clipboard.writeText(reportContent).then(function() {
                 showCopyNotification();
