@@ -78,10 +78,25 @@ python app.py
 
 ## Sample Data Format
 
-Your CSV/Excel file should have these columns:
-- `timestamp` (or `date`, `time`, `visited_at`, etc.)
-- `company` (or `organization`, `company_name`, etc.)
-- `url` (or `page`, `page_url`, `visited_page`, etc.)
+Your Snitcher export should have these columns (standard Snitcher export format):
+- `Name` - Company name
+- `Last visit` - Timestamp of the last visit (used for 24-hour filtering)
+- `Unique pages Visited` - Pages the company visited (comma or semicolon separated URLs)
+
+### Required Columns from Snitcher Export:
+```
+ID, Name, Location, Country, State, City, Industry, Company Size, 
+First visit, Last visit, Website, Phone, Total Visits, Total Pageviews, 
+Unique pages Visited, Total time on Site, All Referrers, Unique Campaigns, 
+Unique Visitor Locations, crunchbase_handle, youtube_handle, facebook_handle, 
+linkedin_handle, angellist_handle, twitter_handle, pinterest_handle, 
+Revealed Contacts (Emails only)
+```
+
+**Key columns used by the app:**
+- **Name**: Company name for the report
+- **Last visit**: To filter visits from last 24 hours
+- **Unique pages Visited**: To determine what the company viewed
 
 ## Security Notes
 

@@ -20,80 +20,105 @@ def process_snitcher_data(file_content, file_extension):
         else:
             raise ValueError("Unsupported file format")
         
-        # Convert timestamp column (assuming it's named 'timestamp', 'date', or similar)
-        timestamp_cols = ['timestamp', 'date', 'time', 'visited_at', 'visit_time']
-        timestamp_col = None
+        # Check for required columns based on Snitcher export format
+        required_cols = {
+            'company': 'Name',
+            'last_visit': 'Last visit', 
+            'pages': 'Unique pages Visited'
+        }
         
-        for col in df.columns:
-            if any(ts_name in col.lower() for ts_name in timestamp_cols):
-                timestamp_col = col
-                break
+        missing_cols = []
+        for key, col_name in required_cols.items():
+            if col_name not in df.columns:
+                missing_cols.append(col_name)
         
-        if not timestamp_col:
-            raise ValueError("No timestamp column found. Expected columns like 'timestamp', 'date', 'time', etc.")
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {', '.join(missing_cols)}. Please ensure this is a Snitcher export file.")
         
-        # Convert to datetime
-        df[timestamp_col] = pd.to_datetime(df[timestamp_col])
+        # Convert Last visit column to datetime
+        df['Last visit'] = pd.to_datetime(df['Last visit'], errors='coerce')
+        
+        # Remove rows where Last visit couldn't be parsed
+        df = df.dropna(subset=['Last visit'])
+        
+        if df.empty:
+            return "No valid visit data found in the file."
         
         # Filter visits from last 24 hours
         now = datetime.now()
         yesterday = now - timedelta(days=1)
-        df_filtered = df[df[timestamp_col] >= yesterday]
+        df_filtered = df[df['Last visit'] >= yesterday]
         
         if df_filtered.empty:
             return "No visits found in the last 24 hours."
         
-        # Sort by timestamp descending to get latest visits first
-        df_filtered = df_filtered.sort_values(timestamp_col, ascending=False)
+        # Sort by Last visit descending to get latest visits first
+        df_filtered = df_filtered.sort_values('Last visit', ascending=False)
         
-        # Get company and URL columns
-        company_cols = ['company', 'organization', 'company_name', 'org']
-        url_cols = ['url', 'page', 'page_url', 'visited_page']
-        
-        company_col = None
-        url_col = None
-        
-        for col in df_filtered.columns:
-            if any(comp_name in col.lower() for comp_name in company_cols):
-                company_col = col
-            if any(url_name in col.lower() for url_name in url_cols):
-                url_col = col
-        
-        if not company_col:
-            raise ValueError("No company column found. Expected columns like 'company', 'organization', etc.")
-        if not url_col:
-            raise ValueError("No URL column found. Expected columns like 'url', 'page', 'page_url', etc.")
-        
-        # Keep only latest visit per company
-        df_latest = df_filtered.drop_duplicates(subset=[company_col], keep='first')
+        # Keep only latest visit per company (first occurrence after sorting)
+        df_latest = df_filtered.drop_duplicates(subset=['Name'], keep='first')
         
         # Process each visit
         visits = []
         for _, row in df_latest.iterrows():
-            company = row[company_col]
-            url = row[url_col]
+            company = row['Name']
+            pages_visited = row['Unique pages Visited']
             
-            # Determine action based on URL
-            if pd.isna(url) or url == '':
-                action = "visited homepage"
-            elif 'hsCtaTracking' in url or '_hcms' in url:
+            # Skip if company name is empty
+            if pd.isna(company) or company == '':
+                continue
+                
+            # Determine action based on pages visited
+            if pd.isna(pages_visited) or pages_visited == '':
                 action = "visited homepage"
             else:
-                # Extract last part of URL and format it
-                parsed_url = urlparse(url)
-                path = parsed_url.path.strip('/')
-                if path:
-                    # Get the last segment
-                    last_segment = path.split('/')[-1]
-                    # Remove file extensions
-                    last_segment = re.sub(r'\.[^.]*$', '', last_segment)
-                    # Replace hyphens and underscores with spaces
-                    formatted_action = re.sub(r'[-_]', ' ', last_segment)
-                    action = f"viewed {formatted_action}"
-                else:
+                # Pages visited might contain multiple URLs separated by commas or semicolons
+                # We'll take the first one for simplicity, or if it contains tracking, show homepage
+                pages_str = str(pages_visited)
+                
+                # Check if it contains homepage indicators
+                if 'hsCtaTracking' in pages_str or '_hcms' in pages_str:
                     action = "visited homepage"
+                else:
+                    # Split by common separators and take the first URL
+                    first_page = pages_str.split(',')[0].split(';')[0].strip()
+                    
+                    if not first_page or first_page == '/':
+                        action = "visited homepage"
+                    else:
+                        # Extract meaningful part from URL
+                        parsed_url = urlparse(first_page) if first_page.startswith('http') else urlparse('http://example.com' + first_page)
+                        path = parsed_url.path.strip('/')
+                        
+                        if path:
+                            # Get the last segment of the path
+                            segments = path.split('/')
+                            last_segment = segments[-1] if segments else ''
+                            
+                            # If last segment is empty or just numbers/IDs, use the previous segment
+                            if not last_segment or last_segment.isdigit() or len(last_segment) < 3:
+                                if len(segments) > 1:
+                                    last_segment = segments[-2]
+                                else:
+                                    last_segment = segments[0] if segments else ''
+                            
+                            if last_segment:
+                                # Remove file extensions
+                                last_segment = re.sub(r'\.[^.]*$', '', last_segment)
+                                # Replace hyphens and underscores with spaces
+                                formatted_action = re.sub(r'[-_]', ' ', last_segment)
+                                # Capitalize first letter
+                                formatted_action = formatted_action.strip().lower()
+                                action = f"viewed {formatted_action}"
+                            else:
+                                action = "visited homepage"
+                        else:
+                            action = "visited homepage"
             
             visits.append(f"- {company}, {action}")
+        
+        if not visits:
+            return "No valid company visits found in the last 24 hours."
         
         # Format the report
         report_date = (now - timedelta(days=1)).strftime("%B %d, %Y")
