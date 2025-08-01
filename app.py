@@ -1,82 +1,122 @@
 from flask import Flask, render_template, request, jsonify, flash
-import pandas as pd
-from datetime import datetime, timedelta
+import csv
 import io
 import re
 from urllib.parse import urlparse
+from datetime import datetime, timedelta
+from dateutil import parser
+import openpyxl
 import os
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'snitcher-dev-key-change-in-production')
 
+def parse_csv_data(csv_content):
+    """Parse CSV content and return list of dictionaries"""
+    csv_reader = csv.DictReader(io.StringIO(csv_content))
+    return list(csv_reader)
+
+def parse_excel_data(excel_content):
+    """Parse Excel content and return list of dictionaries"""
+    workbook = openpyxl.load_workbook(io.BytesIO(excel_content))
+    sheet = workbook.active
+    
+    # Get headers from first row
+    headers = []
+    for cell in sheet[1]:
+        headers.append(cell.value)
+    
+    # Get data rows
+    data = []
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        row_dict = {}
+        for i, value in enumerate(row):
+            if i < len(headers):
+                row_dict[headers[i]] = value
+        data.append(row_dict)
+    
+    return data
+
+def parse_date(date_str):
+    """Parse date string into datetime object"""
+    if not date_str:
+        return None
+    try:
+        return parser.parse(str(date_str))
+    except:
+        return None
+
 def process_snitcher_data(file_content, file_extension):
     """Process the uploaded Snitcher file and return formatted daily report"""
     try:
-        # Read the file based on extension
+        # Parse the file based on extension
         if file_extension.lower() == '.csv':
-            df = pd.read_csv(io.StringIO(file_content))
+            data = parse_csv_data(file_content)
         elif file_extension.lower() in ['.xlsx', '.xls']:
-            df = pd.read_excel(io.BytesIO(file_content))
+            data = parse_excel_data(file_content)
         else:
             raise ValueError("Unsupported file format")
         
-        # Check for required columns based on Snitcher export format
-        required_cols = {
-            'company': 'Name',
-            'last_visit': 'Last visit', 
-            'pages': 'Unique pages Visited'
-        }
+        if not data:
+            return "No data found in the file."
         
-        missing_cols = []
-        for key, col_name in required_cols.items():
-            if col_name not in df.columns:
-                missing_cols.append(col_name)
+        # Check for required columns
+        required_cols = ['Name', 'Last visit', 'Unique pages Visited']
+        sample_row = data[0]
+        missing_cols = [col for col in required_cols if col not in sample_row]
         
         if missing_cols:
             raise ValueError(f"Missing required columns: {', '.join(missing_cols)}. Please ensure this is a Snitcher export file.")
         
-        # Convert Last visit column to datetime
-        df['Last visit'] = pd.to_datetime(df['Last visit'], errors='coerce')
-        
-        # Remove rows where Last visit couldn't be parsed
-        df = df.dropna(subset=['Last visit'])
-        
-        if df.empty:
-            return "No valid visit data found in the file."
-        
-        # Filter visits from last 24 hours
+        # Filter and process data
         now = datetime.now()
         yesterday = now - timedelta(days=1)
-        df_filtered = df[df['Last visit'] >= yesterday]
         
-        if df_filtered.empty:
+        valid_visits = []
+        for row in data:
+            if not row.get('Name') or not row.get('Last visit'):
+                continue
+                
+            last_visit = parse_date(row['Last visit'])
+            if not last_visit or last_visit < yesterday:
+                continue
+                
+            valid_visits.append({
+                'name': row['Name'],
+                'last_visit': last_visit,
+                'pages': row.get('Unique pages Visited', '')
+            })
+        
+        if not valid_visits:
             return "No visits found in the last 24 hours."
         
-        # Sort by Last visit descending to get latest visits first for deduplication
-        df_filtered = df_filtered.sort_values('Last visit', ascending=False)
+        # Sort by last visit descending for deduplication
+        valid_visits.sort(key=lambda x: x['last_visit'], reverse=True)
         
-        # Keep only latest visit per company (first occurrence after sorting)
-        df_latest = df_filtered.drop_duplicates(subset=['Name'], keep='first')
+        # Remove duplicates - keep latest visit per company
+        unique_companies = {}
+        for visit in valid_visits:
+            if visit['name'] not in unique_companies:
+                unique_companies[visit['name']] = visit
         
-        # Now sort by Last visit ascending (oldest to newest) for final output
-        df_latest = df_latest.sort_values('Last visit', ascending=True)
+        # Sort final results by time ascending (oldest to newest)
+        final_visits = list(unique_companies.values())
+        final_visits.sort(key=lambda x: x['last_visit'])
         
         # Process each visit
-        visits = []
-        for _, row in df_latest.iterrows():
-            company = row['Name']
-            pages_visited = row['Unique pages Visited']
+        formatted_visits = []
+        for visit in final_visits:
+            company = visit['name']
+            pages_visited = visit['pages'] or ''
             
             # Skip if company name is empty
-            if pd.isna(company) or company == '':
+            if not company:
                 continue
                 
             # Determine action based on pages visited
-            if pd.isna(pages_visited) or pages_visited == '':
-                action = "visited homepage"
-            else:
-                # Pages visited might contain multiple URLs separated by commas or semicolons
-                # We'll take the first one for simplicity, or if it contains tracking, show homepage
+            action = "visited homepage"
+            
+            if pages_visited:
                 pages_str = str(pages_visited)
                 
                 # Check if it contains homepage indicators
@@ -86,12 +126,13 @@ def process_snitcher_data(file_content, file_extension):
                     # Split by common separators and take the first URL
                     first_page = pages_str.split(',')[0].split(';')[0].strip()
                     
-                    if not first_page or first_page == '/':
-                        action = "visited homepage"
-                    else:
+                    if first_page and first_page != '/':
                         # Extract meaningful part from URL
-                        parsed_url = urlparse(first_page) if first_page.startswith('http') else urlparse('http://example.com' + first_page)
-                        path = parsed_url.path.strip('/')
+                        if first_page.startswith('http'):
+                            parsed_url = urlparse(first_page)
+                            path = parsed_url.path.strip('/')
+                        else:
+                            path = first_page.strip('/')
                         
                         if path:
                             # Get the last segment of the path
@@ -110,22 +151,19 @@ def process_snitcher_data(file_content, file_extension):
                                 last_segment = re.sub(r'\.[^.]*$', '', last_segment)
                                 # Replace hyphens and underscores with spaces
                                 formatted_action = re.sub(r'[-_]', ' ', last_segment)
-                                # Capitalize first letter
+                                # Clean up the action
                                 formatted_action = formatted_action.strip().lower()
-                                action = f"viewed {formatted_action}"
-                            else:
-                                action = "visited homepage"
-                        else:
-                            action = "visited homepage"
+                                if formatted_action:
+                                    action = f"viewed {formatted_action}"
             
-            visits.append(f"- {company}, {action}")
+            formatted_visits.append(f"- {company}, {action}")
         
-        if not visits:
+        if not formatted_visits:
             return "No valid company visits found in the last 24 hours."
         
         # Format the report
-        report_date = (now - timedelta(days=1)).strftime("%B %d, %Y")
-        report = f"EOD {report_date}\n" + "\n".join(visits)
+        report_date = yesterday.strftime("%B %d, %Y")
+        report = f"EOD {report_date}\n" + "\n".join(formatted_visits)
         
         return report
         

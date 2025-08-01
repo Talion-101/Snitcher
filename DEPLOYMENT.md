@@ -6,7 +6,7 @@
 # Environment Variables (set in Render dashboard):
 # - SECRET_KEY: your-secret-key-here
 
-# Runtime: Python 3.11.8 (specified in runtime.txt)
+# Runtime: Any Python 3.x (no pandas dependency issues!)
 # Auto-deploy: Yes
 # Region: Choose your preferred region
 # Instance Type: Free tier is sufficient for basic usage
