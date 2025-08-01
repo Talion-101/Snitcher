@@ -5,11 +5,22 @@ import re
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
 from dateutil import parser
+import pytz
 import openpyxl
 import os
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'snitcher-dev-key-change-in-production')
+
+def get_current_est_time():
+    """Get current EST time formatted for display"""
+    est_tz = pytz.timezone('America/New_York')
+    now_est = datetime.now(est_tz)
+    return {
+        'date': now_est.strftime("%B %d, %Y"),
+        'time': now_est.strftime("%I:%M %p EST"),
+        'datetime': now_est
+    }
 
 def parse_csv_data(csv_content):
     """Parse CSV content and return list of dictionaries"""
@@ -135,9 +146,11 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
         
         # Format the report based on output format
         if output_format == 'table':
-            # Table format with header
-            report_date = latest_date.strftime("%B %d, %Y")
-            report_time = latest_date.strftime("%I:%M %p EST")
+            # Table format with header - convert to EST timezone
+            est_tz = pytz.timezone('America/New_York')
+            latest_date_est = latest_date.astimezone(est_tz) if latest_date.tzinfo else est_tz.localize(latest_date)
+            report_date = latest_date_est.strftime("%B %d, %Y")
+            report_time = latest_date_est.strftime("%I:%M %p EST")
             
             table_rows = []
             for visit in final_visits:
@@ -198,7 +211,15 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
             report += "TABLE_START\n"
             report += "Company,Visited Site\n"
             for row in table_rows:
-                report += f"{row[0]},{row[1]}\n"
+                # Properly escape CSV data
+                company = str(row[0]).replace('"', '""')
+                site = str(row[1]).replace('"', '""')
+                # Add quotes if data contains commas
+                if ',' in company:
+                    company = f'"{company}"'
+                if ',' in site:
+                    site = f'"{site}"'
+                report += f"{company},{site}\n"
             report += "TABLE_END"
             
         elif output_format == 'both':
@@ -313,9 +334,11 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
                 
                 table_rows.append([company, site_description])
             
-            # Format both reports
-            report_date = latest_date.strftime("%B %d, %Y")
-            report_time = latest_date.strftime("%I:%M %p EST")
+            # Format both reports - convert to EST timezone
+            est_tz = pytz.timezone('America/New_York')
+            latest_date_est = latest_date.astimezone(est_tz) if latest_date.tzinfo else est_tz.localize(latest_date)
+            report_date = latest_date_est.strftime("%B %d, %Y")
+            report_time = latest_date_est.strftime("%I:%M %p EST")
             
             # List format section
             list_report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n" + "\n".join(formatted_visits)
@@ -325,7 +348,15 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
             table_report += "TABLE_START\n"
             table_report += "Company,Visited Site\n"
             for row in table_rows:
-                table_report += f"{row[0]},{row[1]}\n"
+                # Properly escape CSV data
+                company = str(row[0]).replace('"', '""')
+                site = str(row[1]).replace('"', '""')
+                # Add quotes if data contains commas
+                if ',' in company:
+                    company = f'"{company}"'
+                if ',' in site:
+                    site = f'"{site}"'
+                table_report += f"{company},{site}\n"
             table_report += "TABLE_END"
             
             # Combine both formats
@@ -387,9 +418,11 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
                 
                 formatted_visits.append(f"• {company}, {action}")
             
-            # Format the report - use the day of the latest visit for the report date
-            report_date = latest_date.strftime("%B %d, %Y")
-            report_time = latest_date.strftime("%I:%M %p EST")
+            # Format the report - use the day of the latest visit for the report date, convert to EST
+            est_tz = pytz.timezone('America/New_York')
+            latest_date_est = latest_date.astimezone(est_tz) if latest_date.tzinfo else est_tz.localize(latest_date)
+            report_date = latest_date_est.strftime("%B %d, %Y")
+            report_time = latest_date_est.strftime("%I:%M %p EST")
             report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n" + "\n".join(formatted_visits)
         
         return report
@@ -439,7 +472,12 @@ def upload_file():
             else:
                 report = process_snitcher_data(file_content, file_extension, time_period, output_format)
             
-            return render_template('upload.html', report=report, success=True)
+            # Get current EST time for report generation timestamp
+            est_info = get_current_est_time()
+            
+            return render_template('upload.html', report=report, success=True, 
+                                 generation_time=est_info['time'], 
+                                 generation_date=est_info['date'])
             
         except Exception as e:
             flash(f'Error processing file: {str(e)}', 'error')
