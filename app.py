@@ -78,8 +78,6 @@ def process_snitcher_data(file_content, file_extension):
             raise ValueError(f"Missing required columns: {', '.join(missing_cols)}. Please ensure this is a Snitcher export file.")
         
         # Filter and process data
-        now = datetime.now()
-        # Instead of strict 24-hour filter, let's be more flexible
         # Get the most recent date in the data to determine the reporting period
         all_dates = []
         for row in data:
@@ -93,9 +91,10 @@ def process_snitcher_data(file_content, file_extension):
         
         # Find the latest date in the data
         latest_date = max(all_dates)
-        # Use the day of the latest visit as our reporting day  
-        report_start = latest_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        report_end = report_start + timedelta(days=1)
+        
+        # Use the most recent 24 hours as the reporting period
+        report_end = latest_date
+        report_start = latest_date - timedelta(hours=24)
         
         valid_visits = []
         for row in data:
@@ -103,8 +102,8 @@ def process_snitcher_data(file_content, file_extension):
                 continue
                 
             last_visit = parse_date(row['Last visit'])
-            # Filter for visits on the reporting day
-            if not last_visit or last_visit < report_start or last_visit >= report_end:
+            # Filter for visits in the last 24 hours from the latest visit
+            if not last_visit or last_visit < report_start or last_visit > report_end:
                 continue
                 
             valid_visits.append({
@@ -114,7 +113,7 @@ def process_snitcher_data(file_content, file_extension):
             })
         
         if not valid_visits:
-            return f"No visits found on {report_start.strftime('%B %d, %Y')}."
+            return f"No visits found in the 24 hours ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}."
         
         # Sort by last visit descending for deduplication
         valid_visits.sort(key=lambda x: x['last_visit'], reverse=True)
@@ -185,10 +184,10 @@ def process_snitcher_data(file_content, file_extension):
             formatted_visits.append(f"- {company}, {action}")
         
         if not formatted_visits:
-            return f"No valid company visits found on {report_start.strftime('%B %d, %Y')}."
+            return f"No valid company visits found in the 24 hours ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}."
         
-        # Format the report
-        report_date = report_start.strftime("%B %d, %Y")
+        # Format the report - use the day of the latest visit for the report date
+        report_date = latest_date.strftime("%B %d, %Y")
         report = f"EOD {report_date}\n" + "\n".join(formatted_visits)
         
         return report
