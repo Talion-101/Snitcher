@@ -135,8 +135,10 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
         
         # Format the report based on output format
         if output_format == 'table':
-            # Table format
-            table_header = "Company | Visited Site\n" + "-" * 50
+            # Table format with header
+            report_date = latest_date.strftime("%B %d, %Y")
+            report_time = latest_date.strftime("%I:%M %p EST")
+            
             table_rows = []
             for visit in final_visits:
                 company = visit['name']
@@ -189,13 +191,145 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
                                     if formatted_page:
                                         site_description = formatted_page
                 
-                table_rows.append(f"{company} | {site_description}")
+                table_rows.append([company, site_description])
             
             # Format the table report
-            period_text = f"{time_period_days} day{'s' if time_period_days > 1 else ''}"
+            report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n"
+            report += "TABLE_START\n"
+            report += "Company,Visited Site\n"
+            for row in table_rows:
+                report += f"{row[0]},{row[1]}\n"
+            report += "TABLE_END"
+            
+        elif output_format == 'both':
+            # Both formats
+            # First generate list format
+            formatted_visits = []
+            for visit in final_visits:
+                company = visit['name']
+                pages_visited = visit['pages'] or ''
+                
+                # Skip if company name is empty
+                if not company:
+                    continue
+                    
+                # Determine action based on pages visited
+                action = "visited homepage"
+                
+                if pages_visited:
+                    pages_str = str(pages_visited)
+                    
+                    # Check if it contains homepage indicators
+                    if 'hsCtaTracking' in pages_str or '_hcms' in pages_str:
+                        action = "visited homepage"
+                    else:
+                        # Split by common separators and take the first URL
+                        first_page = pages_str.split(',')[0].split(';')[0].strip()
+                        
+                        if first_page and first_page != '/':
+                            # Extract meaningful part from URL
+                            if first_page.startswith('http'):
+                                parsed_url = urlparse(first_page)
+                                path = parsed_url.path.strip('/')
+                            else:
+                                path = first_page.strip('/')
+                            
+                            if path:
+                                # Get the last segment of the path
+                                segments = path.split('/')
+                                last_segment = segments[-1] if segments else ''
+                                
+                                # If last segment is empty or just numbers/IDs, use the previous segment
+                                if not last_segment or last_segment.isdigit() or len(last_segment) < 3:
+                                    if len(segments) > 1:
+                                        last_segment = segments[-2]
+                                    else:
+                                        last_segment = segments[0] if segments else ''
+                                
+                                if last_segment:
+                                    # Remove file extensions
+                                    last_segment = re.sub(r'\.[^.]*$', '', last_segment)
+                                    # Replace hyphens and underscores with spaces
+                                    formatted_action = re.sub(r'[-_]', ' ', last_segment)
+                                    # Clean up the action
+                                    formatted_action = formatted_action.strip().lower()
+                                    if formatted_action:
+                                        action = f"viewed {formatted_action}"
+                
+                formatted_visits.append(f"• {company}, {action}")
+            
+            # Generate table rows
+            table_rows = []
+            for visit in final_visits:
+                company = visit['name']
+                pages_visited = visit['pages'] or ''
+                
+                # Skip if company name is empty
+                if not company:
+                    continue
+                    
+                # Determine site description (same logic as above)
+                site_description = "Homepage"
+                
+                if pages_visited:
+                    pages_str = str(pages_visited)
+                    
+                    # Check if it contains homepage indicators
+                    if 'hsCtaTracking' in pages_str or '_hcms' in pages_str:
+                        site_description = "Homepage"
+                    else:
+                        # Split by common separators and take the first URL
+                        first_page = pages_str.split(',')[0].split(';')[0].strip()
+                        
+                        if first_page and first_page != '/':
+                            # Extract meaningful part from URL
+                            if first_page.startswith('http'):
+                                parsed_url = urlparse(first_page)
+                                path = parsed_url.path.strip('/')
+                            else:
+                                path = first_page.strip('/')
+                            
+                            if path:
+                                # Get the last segment of the path
+                                segments = path.split('/')
+                                last_segment = segments[-1] if segments else ''
+                                
+                                # If last segment is empty or just numbers/IDs, use the previous segment
+                                if not last_segment or last_segment.isdigit() or len(last_segment) < 3:
+                                    if len(segments) > 1:
+                                        last_segment = segments[-2]
+                                    else:
+                                        last_segment = segments[0] if segments else ''
+                                
+                                if last_segment:
+                                    # Remove file extensions
+                                    last_segment = re.sub(r'\.[^.]*$', '', last_segment)
+                                    # Replace hyphens and underscores with spaces
+                                    formatted_page = re.sub(r'[-_]', ' ', last_segment)
+                                    # Clean up and capitalize
+                                    formatted_page = formatted_page.strip().title()
+                                    if formatted_page:
+                                        site_description = formatted_page
+                
+                table_rows.append([company, site_description])
+            
+            # Format both reports
             report_date = latest_date.strftime("%B %d, %Y")
-            report = f"Visitor Report - Last {period_text} (ending {report_date})\n\n"
-            report += table_header + "\n" + "\n".join(table_rows)
+            report_time = latest_date.strftime("%I:%M %p EST")
+            
+            # List format section
+            list_report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n" + "\n".join(formatted_visits)
+            
+            # Table format section
+            table_report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n"
+            table_report += "TABLE_START\n"
+            table_report += "Company,Visited Site\n"
+            for row in table_rows:
+                table_report += f"{row[0]},{row[1]}\n"
+            table_report += "TABLE_END"
+            
+            # Combine both formats
+            report = f"LIST_FORMAT_START\n{list_report}\nLIST_FORMAT_END\n\nTABLE_FORMAT_START\n{table_report}\nTABLE_FORMAT_END"
             
         else:
             # List format (original)
@@ -291,7 +425,7 @@ def upload_file():
                 time_period = 365
                 
             output_format = request.form.get('output_format', 'list')
-            if output_format not in ['list', 'table']:
+            if output_format not in ['list', 'table', 'both']:
                 output_format = 'list'
             
             # Read file content
