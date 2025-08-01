@@ -146,11 +146,10 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
         
         # Format the report based on output format
         if output_format == 'table':
-            # Table format with header - convert to EST timezone
-            est_tz = pytz.timezone('America/New_York')
-            latest_date_est = latest_date.astimezone(est_tz) if latest_date.tzinfo else est_tz.localize(latest_date)
-            report_date = latest_date_est.strftime("%B %d, %Y")
-            report_time = latest_date_est.strftime("%I:%M %p EST")
+            # Table format with header - use current EST time for report generation
+            current_est = get_current_est_time()
+            report_date = current_est['date']
+            report_time = current_est['time']
             
             table_rows = []
             for visit in final_visits:
@@ -334,11 +333,10 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
                 
                 table_rows.append([company, site_description])
             
-            # Format both reports - convert to EST timezone
-            est_tz = pytz.timezone('America/New_York')
-            latest_date_est = latest_date.astimezone(est_tz) if latest_date.tzinfo else est_tz.localize(latest_date)
-            report_date = latest_date_est.strftime("%B %d, %Y")
-            report_time = latest_date_est.strftime("%I:%M %p EST")
+            # Format both reports - use current EST time for report generation
+            current_est = get_current_est_time()
+            report_date = current_est['date']
+            report_time = current_est['time']
             
             # List format section
             list_report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n" + "\n".join(formatted_visits)
@@ -418,11 +416,10 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
                 
                 formatted_visits.append(f"• {company}, {action}")
             
-            # Format the report - use the day of the latest visit for the report date, convert to EST
-            est_tz = pytz.timezone('America/New_York')
-            latest_date_est = latest_date.astimezone(est_tz) if latest_date.tzinfo else est_tz.localize(latest_date)
-            report_date = latest_date_est.strftime("%B %d, %Y")
-            report_time = latest_date_est.strftime("%I:%M %p EST")
+            # Format the report - use current EST time for report generation
+            current_est = get_current_est_time()
+            report_date = current_est['date']
+            report_time = current_est['time']
             report = f"Here is the daily snitcher update as of {report_date}, {report_time}\n\n" + "\n".join(formatted_visits)
         
         return report
