@@ -163,10 +163,10 @@ def process_snitcher_data(file_content, file_extension, time_period_days=1, outp
         final_visits = list(unique_companies.values())
         final_visits.sort(key=lambda x: x['last_visit'])
 
+
         if not final_visits:
             period_text = f"{time_period_days} day{'s' if time_period_days > 1 else ''}"
-            return f"No valid company visits found in the last {period_text} ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}.
-
+            return f"No valid company visits found in the last {period_text} ending {latest_date.strftime('%B %d, %Y at %I:%M %p')}."
 
         # List format only - table format removed entirely
         formatted_visits = []
