@@ -161,20 +161,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Page load animations
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                const container = document.getElementById('mainContainer');
-                if (container) {
-                    container.classList.add('loaded');
-                }
-            }, 100);
-            
-            updateClocks();
-            setInterval(updateClocks, 1000);
-        });
-
-        // Real-time clock updates
+        // Basic clock updates without animations
         function updateClocks() {
             const now = new Date();
             
@@ -214,84 +201,55 @@
             document.getElementById('estDate').textContent = estDate;
         }
 
-        // File input handling
+        // Initialize clock updates
+        document.addEventListener('DOMContentLoaded', function() {
+            updateClocks();
+            setInterval(updateClocks, 1000);
+        });
+
+        // Simple file input handling
         document.getElementById('file').addEventListener('change', function(e) {
-            const fileLabel = document.getElementById('fileLabel');
             const labelText = document.getElementById('labelText');
-            
             if (e.target.files.length > 0) {
-                const fileName = e.target.files[0].name;
-                labelText.textContent = fileName;
-                fileLabel.classList.add('file-selected');
+                labelText.textContent = e.target.files[0].name;
             } else {
                 labelText.textContent = 'Choose Snitcher export file (CSV or Excel)';
-                fileLabel.classList.remove('file-selected');
             }
         });
 
-        // Form submission handling
+        // Form submission
         document.getElementById('uploadForm').addEventListener('submit', function(e) {
             const btn = document.getElementById('generateBtn');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            btn.innerHTML = 'Processing...';
         });
 
-        // Copy to clipboard function
-        function copyToClipboard(text, button) {
-            navigator.clipboard.writeText(text).then(function() {
-                // Show success animation
-                const originalContent = button.innerHTML;
-                button.classList.add('copied');
-                button.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
-                
-                // Show notification
-                const notification = document.getElementById('copyNotification');
-                notification.classList.add('show');
-                
-                // Reset after delay
-                setTimeout(function() {
-                    button.classList.remove('copied');
-                    button.innerHTML = originalContent;
-                    notification.classList.remove('show');
-                }, 2000);
-            }).catch(function(err) {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                
-                // Show success feedback
-                const originalContent = button.innerHTML;
-                button.classList.add('copied');
-                button.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
-                
-                setTimeout(function() {
-                    button.classList.remove('copied');
-                    button.innerHTML = originalContent;
-                }, 2000);
-            });
-        }
-
-        // Function to copy the report text
+        // Simple copy functionality without animations
         function copyReportText() {
             const reportElement = document.querySelector('.report-preview pre');
             if (reportElement) {
                 const reportText = reportElement.textContent;
-                const button = event.target.closest('.btn-copy');
-                copyToClipboard(reportText, button);
+                navigator.clipboard.writeText(reportText).then(function() {
+                    const button = event.target.closest('.btn-copy');
+                    button.innerHTML = 'Copied!';
+                    setTimeout(() => {
+                        button.innerHTML = '<i class="fas fa-copy me-2"></i>Copy Report';
+                    }, 2000);
+                }).catch(function() {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = reportText;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                });
             }
         }
 
         // Prevent form resubmission on refresh
-        if (performance.navigation.type === performance.navigation.TYPE_RELOAD) {
-            const url = new URL(window.location);
-            if (url.searchParams.toString()) {
-                url.search = '';
-                window.history.replaceState({}, '', url);
-            }
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
         }
     </script>
 </body>
