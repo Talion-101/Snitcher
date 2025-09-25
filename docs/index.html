@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snitcher Report Generator (Static)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container-fluid min-vh-100 d-flex align-items-center justify-content-center">
+        <div class="main-container" id="mainContainer">
+            <div class="glass-card">
+                <div class="card-header text-center mb-4">
+                    <h1 class="title">
+                        <i class="fas fa-chart-line me-3"></i>
+                        Snitcher Report Generator
+                    </h1>
+                    <p class="subtitle">Upload your Snitcher export to generate a formatted daily report</p>
+                    <p class="subtitle mt-2" style="font-size: 0.9rem; opacity: 0.6;">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Supports standard Snitcher CSV/Excel exports with Name, Last visit, and Unique pages Visited columns
+                    </p>
+                    
+                    <!-- Real-time Clock Section -->
+                    <div class="clock-section mt-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="clock-card">
+                                    <div class="clock-label">
+                                        <i class="fas fa-globe me-2"></i>
+                                        Your Local Time
+                                    </div>
+                                    <div class="clock-time" id="localTime">--:--:-- --</div>
+                                    <div class="clock-date" id="localDate">Loading...</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="clock-card">
+                                    <div class="clock-label">
+                                        <i class="fas fa-building me-2"></i>
+                                        EST (Atlanta, GA)
+                                    </div>
+                                    <div class="clock-time" id="estTime">--:--:-- --</div>
+                                    <div class="clock-date" id="estDate">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Form -->
+                <div class="mb-4">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="file" class="file-input" accept=".csv,.xlsx,.xls" required>
+                        <label for="file" class="file-input-label" id="fileLabel">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>
+                            <span id="labelText">Choose Snitcher export file (CSV or Excel)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Options Section -->
+                <div class="options-section">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="time_period" class="option-label">
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                Time Period (Days)
+                            </label>
+                            <select id="time_period" class="glass-select w-100">
+                                <option value="1" selected>Last 1 Day</option>
+                                <option value="2">Last 2 Days</option>
+                                <option value="3">Last 3 Days</option>
+                                <option value="7">Last 7 Days</option>
+                                <option value="14">Last 14 Days</option>
+                                <option value="30">Last 30 Days</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <button type="button" class="btn-glow" id="generateBtn">
+                        <i class="fas fa-magic me-2"></i>
+                        Generate Report
+                    </button>
+                </div>
+
+                <!-- Report Results -->
+                <div id="reportSection" style="display: none;">
+                    <div class="report-section">
+                        <div class="report-header d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h2 class="report-title">Generated Report</h2>
+                                <p class="report-timestamp" id="reportTimestamp">
+                                    <i class="fas fa-clock me-2"></i>
+                                    Generated on <span id="generationDate"></span> at <span id="generationTime"></span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="report-box">
+                            <div class="report-box-header">
+                                <h4 class="report-format-title">
+                                    <i class="fas fa-list-ul me-2"></i>
+                                    Daily Report (List Format)
+                                </h4>
+                            </div>
+                            <div class="report-box-content">
+                                <div class="report-preview">
+                                    <pre id="reportContent"></pre>
+                                </div>
+                                <div class="text-end mt-3">
+                                    <button class="btn-copy" onclick="copyReportText()">
+                                        <i class="fas fa-copy me-2"></i>
+                                        Copy Report
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Messages -->
+                <div id="alertContainer"></div>
+
+                <!-- Footer -->
+                <div class="footer-section text-center">
+                    <p class="footer-text">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        All data is processed in your browser. No files are uploaded to any server.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
