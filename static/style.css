@@ -1,24 +1,13 @@
-/* High-Performance Reset and Base Styles */
+/* Reset and Base Styles */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-/* Hide all scrollbars globally */
-* {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* Internet Explorer 10+ */
-}
-
-*::-webkit-scrollbar {
-    display: none; /* WebKit */
-}
-
 html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
 }
 
 body {
@@ -26,12 +15,7 @@ body {
     background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
     color: #ffffff;
     min-height: 100vh;
-    overflow-x: hidden;
-    /* Remove vertical scrolling */
-    overflow-y: hidden;
     position: relative;
-    contain: layout style paint;
-    transform: translateZ(0); /* Force hardware acceleration */
 }
 
 /* High-Performance Animated Background */
